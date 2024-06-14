@@ -1,0 +1,46 @@
+# Rust
+- name: "Rust"
+  extensions:
+  - "rs"
+  comments:
+  - "//"
+  multiline_comment_start:
+  - "/*"
+  multiline_comment_end:
+  - "*/"
+# Dart
+- name: "Dart"
+  extensions:
+  - "dart"
+  comments:
+  - "//"
+  multiline_comment_start:
+  - "/*"
+  multiline_comment_end:
+  - "*/"
+# JavaScript
+- name: "JavaScript"
+  extensions:
+  - "js"
+  comments:
+  - "//"
+  multiline_comment_start:
+  - "/*"
+  multiline_comment_end:
+  - "*/"
+# C/C++
+- name: "C/C++"
+  extensions:
+  - "c"
+  - "h"
+  - "cxx"
+  - "hxx"
+  - "cc"
+  - "hpp"
+  - "cpp"
+  comments:
+  - "//"
+  multiline_comment_start:
+  - "/*"
+  multiline_comment_end:
+  - "*/"

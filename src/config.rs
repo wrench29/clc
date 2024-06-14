@@ -1,4 +1,6 @@
-#[derive(Clone)]
+use std::{fs, io};
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TextFileDescription {
     pub name: String,
     pub extensions: Vec<String>,
@@ -26,7 +28,10 @@ impl Default for AnalyzerConfiguration {
 }
 
 impl AnalyzerConfiguration {
-    pub fn load_from_file() -> Self {
-        Self { file_types: vec![] }
+    pub fn load_from_file() -> io::Result<Self> {
+        let config_raw = fs::read_to_string("formats.yaml")?;
+        let config: Vec<TextFileDescription> =
+            serde_yaml::from_str(&config_raw).expect("config format should be valid");
+        Ok(Self { file_types: config })
     }
 }
