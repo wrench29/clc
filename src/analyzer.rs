@@ -12,6 +12,8 @@ pub struct CodeAnalyzer {
 }
 
 pub struct CodeAnalysisReport {
+    files_total: u64,
+    files_ignored: u64,
     rows: HashMap<String, CodeAnalysisReportRow>,
 }
 
@@ -41,6 +43,8 @@ impl CodeAnalyzer {
     pub fn analyze_dir(&self, dir_path: &Path) -> io::Result<CodeAnalysisReport> {
         let file_paths = Self::get_files_in_directory(dir_path)?;
         let mut report = CodeAnalysisReport {
+            files_total: 0,
+            files_ignored: 0,
             rows: HashMap::new(),
         };
         for file_path in file_paths {
@@ -64,7 +68,10 @@ impl CodeAnalyzer {
                 report_row.code_lines_count += file_analysis.code_lines_count;
                 report_row.comment_lines_count += file_analysis.comment_lines_count;
                 report_row.empty_lines_count += file_analysis.empty_lines_count;
+            } else {
+                report.files_ignored += 1;
             }
+            report.files_total += 1;
         }
         Ok(report)
     }
@@ -81,35 +88,56 @@ impl CodeAnalyzer {
                     empty_lines_count: 0,
                 };
                 let file_content = fs::read_to_string(file_path)?;
-                let comments = &known_file.comments;
-                let multiline_comment_starts = &known_file.multiline_comment_start;
-                let multiline_comment_ends = &known_file.multiline_comment_end;
                 let mut multiline_comment = false;
                 for line in file_content.lines() {
-                    if line.trim().len() == 0 {
+                    let line_trimmed = line.trim();
+                    if line_trimmed.len() == 0 {
                         file_analysis.empty_lines_count += 1;
                         continue;
                     }
                     let mut was_comment = false;
-                    if !multiline_comment {
-                        for comment in multiline_comment_starts {
-                            if line.starts_with(comment) {
-                                multiline_comment = true;
-                            }
-                        }
-                    }
-                    if multiline_comment {
-                        for comment in multiline_comment_ends {
-                            if line.contains(comment) {
-                                multiline_comment = false;
-                            }
-                        }
+                    if Self::is_line_comment(line_trimmed, &known_file.comments) {
                         was_comment = true;
-                    }
-                    if !multiline_comment {
-                        for comment in comments {
-                            if line.starts_with(comment) {
+                    } else if multiline_comment {
+                        if Self::is_line_multiline_comment_end(
+                            line_trimmed,
+                            &known_file.multiline_comment_end,
+                        ) {
+                            if Self::is_line_multiline_comment_end_only(
+                                line_trimmed,
+                                &known_file.multiline_comment_end,
+                            ) {
                                 was_comment = true;
+                            }
+                            multiline_comment = false;
+                        } else {
+                            was_comment = true;
+                        }
+                    } else {
+                        if Self::is_line_multiline_comment_start(
+                            line_trimmed,
+                            &known_file.multiline_comment_start,
+                        ) {
+                            if Self::is_line_multiline_comment_start_only(
+                                line_trimmed,
+                                &known_file.multiline_comment_start,
+                            ) {
+                                if Self::is_line_multiline_comment_end(
+                                    line_trimmed,
+                                    &known_file.multiline_comment_end,
+                                ) {
+                                    if Self::is_line_multiline_comment_end_only(
+                                        line_trimmed,
+                                        &known_file.multiline_comment_end,
+                                    ) {
+                                        was_comment = true;
+                                    }
+                                } else {
+                                    was_comment = true;
+                                    multiline_comment = true;
+                                }
+                            } else {
+                                multiline_comment = true;
                             }
                         }
                     }
@@ -124,6 +152,46 @@ impl CodeAnalyzer {
             }
         }
         Ok(None)
+    }
+    fn is_line_comment(line: &str, comments: &Vec<String>) -> bool {
+        for comment in comments {
+            if line.starts_with(comment) {
+                return true;
+            }
+        }
+        false
+    }
+    fn is_line_multiline_comment_start(line: &str, comments: &Vec<String>) -> bool {
+        for comment in comments {
+            if line.contains(comment) {
+                return true;
+            }
+        }
+        false
+    }
+    fn is_line_multiline_comment_start_only(line: &str, comments: &Vec<String>) -> bool {
+        for comment in comments {
+            if line.starts_with(comment) {
+                return true;
+            }
+        }
+        false
+    }
+    fn is_line_multiline_comment_end(line: &str, comments: &Vec<String>) -> bool {
+        for comment in comments {
+            if line.contains(comment) {
+                return true;
+            }
+        }
+        false
+    }
+    fn is_line_multiline_comment_end_only(line: &str, comments: &Vec<String>) -> bool {
+        for comment in comments {
+            if line.ends_with(comment) {
+                return true;
+            }
+        }
+        false
     }
     fn find_file_type_by_ext(&self, extension: &str) -> Option<String> {
         for known_file in &self.known_files {
@@ -157,12 +225,19 @@ impl CodeAnalyzer {
 
 impl Display for CodeAnalysisReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "--- Report ---\n  Files total: {}\n  Files ignored: {}\n  Files scanned: {}",
+            self.files_total,
+            self.files_ignored,
+            self.files_total - self.files_ignored
+        )?;
         for row_key in self.rows.keys() {
             let row = self.rows.get(row_key).unwrap();
-            write!(f, "--- {} ({}) ---\n", row_key, row.text_files_extensions)?;
+            write!(f, "\n--- {} ({}) ---\n", row_key, row.text_files_extensions)?;
             write!(
                 f,
-                "Files: {}\nLines:\nCode: {}\t | Empty: {}\t | Comments: {}\n",
+                "  Files: {}\n  Lines:\n    Code: {}\n    Empty: {}\n    Comment-only: {}",
                 row.files_count,
                 row.code_lines_count,
                 row.empty_lines_count,

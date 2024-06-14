@@ -12,5 +12,5 @@ fn main() {
     let report = analyzer
         .analyze_dir(&PathBuf::from_str(".").unwrap())
         .unwrap();
-    println!("Code report:\n{}", report);
+    println!("{}", report);
 }
