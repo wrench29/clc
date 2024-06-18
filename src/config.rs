@@ -1,4 +1,7 @@
-use std::{fs, io};
+use std::{
+    env, fs, io,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TextFileDescription {
@@ -28,10 +31,25 @@ impl Default for AnalyzerConfiguration {
 }
 
 impl AnalyzerConfiguration {
-    pub fn load_from_file() -> io::Result<Self> {
-        let config_raw = fs::read_to_string("formats.yaml")?;
+    pub fn load_from_file(path_to_config: &Path) -> io::Result<Self> {
+        let config_raw = fs::read_to_string(path_to_config)?;
         let config: Vec<TextFileDescription> =
             serde_yaml::from_str(&config_raw).expect("config format should be valid");
         Ok(Self { file_types: config })
+    }
+    pub fn find_correct_config_file() -> Option<PathBuf> {
+        let config_path = PathBuf::from("formats.yaml");
+        if config_path.exists() {
+            return Some(config_path);
+        }
+        let path_with_exec = env::current_exe();
+        if let Ok(mut path_with_exec) = path_with_exec {
+            path_with_exec.pop();
+            let config_path = path_with_exec.join("formats.yaml");
+            if config_path.exists() {
+                return Some(config_path);
+            }
+        }
+        None
     }
 }
